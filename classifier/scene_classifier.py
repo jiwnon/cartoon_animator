@@ -1,4 +1,3 @@
-import base64
 import json
 import re
 from pathlib import Path
@@ -15,8 +14,12 @@ CLASSIFY_PROMPT = """이 웹툰 패널 이미지를 분석해서 JSON만 출력�
 - background: 배경 묘사, 인물 없거나 매우 작음
 - other: 위에 해당 없음
 
+텍스트 분류:
+- narration: 네모 박스 안 텍스트, 배경/상황 설명, 내레이션, 독백 (말풍선 아닌 것)
+- dialogues: 말풍선 안 대사 목록
+
 출력 형식:
-{"type":"action","confidence":0.9,"tags":["fight"],"zoom_direction":"in","pace":"fast","focus_point":[0.5,0.5]}"""
+{"type":"dialogue","confidence":0.9,"tags":["conversation"],"zoom_direction":"in","pace":"normal","focus_point":[0.5,0.5],"narration":"내레이션 텍스트 (없으면 빈 문자열)","dialogues":["대사1","대사2"]}"""
 
 
 def _parse_json_from_response(text: str) -> dict:
@@ -55,7 +58,7 @@ class SceneClassifier:
     def __init__(self, config: dict):
         self.model = config.get("model", "llava")
         self.host = config.get("ollama_host", "http://localhost:11434")
-        self.threshold = config.get("confidence_threshold", 0.7)
+        self.threshold = config.get("confidence_threshold", 0.5)
 
     def classify(self, panel: Panel) -> dict:
         import ollama
@@ -76,6 +79,10 @@ class SceneClassifier:
         if result.get("confidence", 0) < self.threshold:
             result["type"] = "other"
 
+        # 기본값 보정
+        result.setdefault("narration", "")
+        result.setdefault("dialogues", [])
+
         return result
 
     def classify_all(self, panels: list[Panel]) -> list[Panel]:
@@ -91,8 +98,16 @@ class SceneClassifier:
                     "zoom_direction": "none",
                     "pace": "normal",
                     "focus_point": [0.5, 0.5],
+                    "narration": "",
+                    "dialogues": [],
                 }
+
             panel.scene_type = result["type"]
             panel.scene_meta = result
-            print(f"  panel {panel.order:03d} → {panel.scene_type} ({result.get('confidence', 0):.2f})")
+            panel.narration_text = result.get("narration", "")
+            panel.dialogue_text = " / ".join(result.get("dialogues", []))
+
+            narr_preview = f' 내레이션="{panel.narration_text[:20]}..."' if panel.narration_text else ""
+            print(f"  panel {panel.order:03d} → {panel.scene_type} ({result.get('confidence', 0):.2f}){narr_preview}")
+
         return panels

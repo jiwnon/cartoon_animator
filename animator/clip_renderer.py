@@ -3,8 +3,7 @@ from .ken_burns import EffectParams
 
 
 class ClipRenderer:
-    def __init__(self, resolution: str = "1920x1080", fps: int = 30):
-        self.resolution = resolution
+    def __init__(self, fps: int = 30):
         self.fps = fps
 
     def render(self, effect: EffectParams, output_path: str) -> str:

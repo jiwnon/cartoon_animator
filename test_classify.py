@@ -33,7 +33,14 @@ def main():
     for panel in panels:
         try:
             result = classifier.classify(panel)
-            print(f"[{panel.order:03d}] {result['type']:12s} confidence={result.get('confidence', 0):.2f}  tags={result.get('tags', [])}")
+            narration = result.get("narration", "")
+            dialogues = result.get("dialogues", [])
+            print(f"[{panel.order:03d}] {result['type']:12s} conf={result.get('confidence', 0):.2f}  tags={result.get('tags', [])}")
+            if narration:
+                print(f"       내레이션: {narration}")
+            if dialogues:
+                for d in dialogues:
+                    print(f"       대사: {d}")
         except Exception as e:
             print(f"[{panel.order:03d}] 오류: {e}")
 

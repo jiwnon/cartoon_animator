@@ -8,7 +8,8 @@ class Panel:
     order: int
     image_url: str
     image_path: Optional[str] = None
-    dialogue_text: str = ""
+    dialogue_text: str = ""       # 말풍선 대사
+    narration_text: str = ""      # 내레이션/서술 텍스트 (TTS 읽기용)
     scene_type: Optional[str] = None
     scene_meta: dict = field(default_factory=dict)
 
