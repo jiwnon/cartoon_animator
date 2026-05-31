@@ -6,7 +6,7 @@ crawler:
 classifier:
   model: "llava"           # ollama pull llava 로 설치
   ollama_host: "http://localhost:11434"
-  confidence_threshold: 0.7
+  confidence_threshold: 0.5
 
 animator:
   resolution: "1920x1080"

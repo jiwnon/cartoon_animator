@@ -20,12 +20,35 @@ CLASSIFY_PROMPT = """이 웹툰 패널 이미지를 분석해서 JSON만 출력�
 
 
 def _parse_json_from_response(text: str) -> dict:
-    # 모델이 JSON 외 텍스트를 섞어도 추출
+    """중괄호 depth 추적으로 첫 번째 완전한 JSON 객체만 추출."""
     text = text.strip()
-    match = re.search(r'\{.*\}', text, re.DOTALL)
-    if match:
-        return json.loads(match.group())
-    raise ValueError(f"JSON을 찾을 수 없음: {text[:200]}")
+    start = text.find('{')
+    if start == -1:
+        raise ValueError(f"JSON을 찾을 수 없음: {text[:200]}")
+
+    depth = 0
+    in_string = False
+    escape = False
+    for i, ch in enumerate(text[start:], start):
+        if escape:
+            escape = False
+            continue
+        if ch == '\\' and in_string:
+            escape = True
+            continue
+        if ch == '"':
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if ch == '{':
+            depth += 1
+        elif ch == '}':
+            depth -= 1
+            if depth == 0:
+                return json.loads(text[start:i + 1])
+
+    raise ValueError(f"완전한 JSON 객체를 찾을 수 없음: {text[:200]}")
 
 
 class SceneClassifier:
