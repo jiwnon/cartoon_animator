@@ -1,62 +1,54 @@
 import base64
 import json
+import re
 from pathlib import Path
 from crawler.playwright_crawler import Panel
 
 SCENE_TYPES = ["action", "dialogue", "emotion", "background", "other"]
 
-CLASSIFY_PROMPT = """이 웹툰 패널 이미지를 분석해서 JSON으로 답해줘.
+CLASSIFY_PROMPT = """이 웹툰 패널 이미지를 분석해서 JSON만 출력해줘. 설명 없이 JSON만.
 
 씬 타입:
-- action: 싸움, 충돌, 빠른 움직임
+- action: 싸움, 충돌, 빠른 움직임, 효과선
 - dialogue: 캐릭터 간 대화, 말풍선 위주
-- emotion: 감정 표현, 클로즈업 표정
-- background: 배경 묘사, 인물 없거나 작음
+- emotion: 감정 표현, 클로즈업 얼굴
+- background: 배경 묘사, 인물 없거나 매우 작음
 - other: 위에 해당 없음
 
-응답 형식 (JSON만):
-{
-  "type": "action|dialogue|emotion|background|other",
-  "confidence": 0.0~1.0,
-  "tags": ["tag1", "tag2"],
-  "zoom_direction": "in|out|none",
-  "pace": "fast|normal|slow",
-  "focus_point": [0.5, 0.5]
-}"""
+출력 형식:
+{"type":"action","confidence":0.9,"tags":["fight"],"zoom_direction":"in","pace":"fast","focus_point":[0.5,0.5]}"""
+
+
+def _parse_json_from_response(text: str) -> dict:
+    # 모델이 JSON 외 텍스트를 섞어도 추출
+    text = text.strip()
+    match = re.search(r'\{.*\}', text, re.DOTALL)
+    if match:
+        return json.loads(match.group())
+    raise ValueError(f"JSON을 찾을 수 없음: {text[:200]}")
 
 
 class SceneClassifier:
     def __init__(self, config: dict):
-        self.model = config.get("model", "claude-sonnet-4-6")
+        self.model = config.get("model", "llava")
+        self.host = config.get("ollama_host", "http://localhost:11434")
         self.threshold = config.get("confidence_threshold", 0.7)
-        self._client = None
-
-    def _get_client(self):
-        if self._client is None:
-            import anthropic
-            self._client = anthropic.Anthropic()
-        return self._client
 
     def classify(self, panel: Panel) -> dict:
-        image_data = Path(panel.image_path).read_bytes()
-        b64 = base64.standard_b64encode(image_data).decode("utf-8")
-        ext = Path(panel.image_path).suffix.lstrip(".")
-        media_type = f"image/{'jpeg' if ext == 'jpg' else ext}"
+        import ollama
 
-        response = self._get_client().messages.create(
+        client = ollama.Client(host=self.host)
+        response = client.chat(
             model=self.model,
-            max_tokens=256,
             messages=[{
                 "role": "user",
-                "content": [
-                    {"type": "image", "source": {"type": "base64", "media_type": media_type, "data": b64}},
-                    {"type": "text", "text": CLASSIFY_PROMPT},
-                ],
+                "content": CLASSIFY_PROMPT,
+                "images": [panel.image_path],
             }],
         )
 
-        raw = response.content[0].text.strip()
-        result = json.loads(raw)
+        raw = response["message"]["content"]
+        result = _parse_json_from_response(raw)
 
         if result.get("confidence", 0) < self.threshold:
             result["type"] = "other"
@@ -65,7 +57,18 @@ class SceneClassifier:
 
     def classify_all(self, panels: list[Panel]) -> list[Panel]:
         for panel in panels:
-            result = self.classify(panel)
+            try:
+                result = self.classify(panel)
+            except Exception as e:
+                print(f"  panel {panel.order:03d} 분류 실패: {e} → other로 처리")
+                result = {
+                    "type": "other",
+                    "confidence": 0.0,
+                    "tags": [],
+                    "zoom_direction": "none",
+                    "pace": "normal",
+                    "focus_point": [0.5, 0.5],
+                }
             panel.scene_type = result["type"]
             panel.scene_meta = result
             print(f"  panel {panel.order:03d} → {panel.scene_type} ({result.get('confidence', 0):.2f})")

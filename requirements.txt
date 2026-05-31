@@ -7,7 +7,7 @@ kokoro-tts
 torch
 torchvision
 segment-anything-2
-anthropic
+ollama
 python-dotenv
 pyyaml
 librosa
