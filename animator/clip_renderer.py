@@ -14,10 +14,10 @@ class ClipRenderer:
 
         (
             ffmpeg
-            .input(effect.image_path, loop=1, t=effect.duration)
-            .filter_("vf", vf)
+            .input(effect.image_path, loop=1, t=effect.duration, framerate=self.fps)
             .output(
                 output_path,
+                vf=vf,
                 vcodec="libx264",
                 pix_fmt="yuv420p",
                 r=self.fps,
