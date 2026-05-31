@@ -11,23 +11,38 @@ def load_config(config_path: str = "config.yaml") -> dict:
         return yaml.safe_load(f)
 
 
+def _is_naver(url: str) -> bool:
+    return "comic.naver.com" in url or "webtoon.naver.com" in url
+
+
 def run_crawl(url: str, output_dir: str, config: dict):
-    from crawler.playwright_crawler import WebtoonCrawler
-    crawler = WebtoonCrawler(config["crawler"])
-    panels = crawler.crawl(url)
+    if _is_naver(url):
+        from crawler.naver_crawler import NaverWebtoonCrawler, parse_naver_url
+        crawler = NaverWebtoonCrawler(config["crawler"])
+        panels = crawler.crawl(url)
+
+        meta = parse_naver_url(url)
+        save_dir = Path(output_dir) / meta["title_id"] / f"ep{meta['episode']}"
+        save_dir.mkdir(parents=True, exist_ok=True)
+
+        panels = crawler.download(panels, save_dir)
+    else:
+        from crawler.playwright_crawler import WebtoonCrawler
+        crawler = WebtoonCrawler(config["crawler"])
+        panels = crawler.crawl(url)
+
+        from crawler.image_downloader import ImageDownloader
+        from classifier.metadata_parser import MetadataParser
+        meta = MetadataParser().parse(url)
+        save_dir = Path(output_dir) / meta["title"] / meta["episode"]
+        save_dir.mkdir(parents=True, exist_ok=True)
+        ImageDownloader().save(panels, save_dir)
 
     from crawler.ocr_extractor import OCRExtractor
-    ocr = OCRExtractor()
-    panels = ocr.extract_all(panels)
+    panels = OCRExtractor().extract_all(panels)
 
-    from classifier.metadata_parser import MetadataParser
-    meta = MetadataParser().parse(url)
-    save_dir = Path(output_dir) / meta["title"] / meta["episode"]
-    save_dir.mkdir(parents=True, exist_ok=True)
-
-    from crawler.image_downloader import ImageDownloader
-    ImageDownloader().save(panels, save_dir)
-    print(f"[crawl] {len(panels)} panels saved → {save_dir}")
+    print(f"[crawl] {len(panels)}개 패널 저장 완료 → {save_dir}")
+    return save_dir, {"title_id": meta.get("title_id", "unknown"), "episode": meta.get("episode", "1")}
     return save_dir, meta
 
 
