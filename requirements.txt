@@ -1,0 +1,14 @@
+playwright
+pillow
+opencv-python
+easyocr
+ffmpeg-python
+kokoro-tts
+torch
+torchvision
+segment-anything-2
+anthropic
+python-dotenv
+pyyaml
+librosa
+pydub

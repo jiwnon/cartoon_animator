@@ -1,0 +1,31 @@
+crawler:
+  delay: 2.0
+  max_panels: 100
+  headless: true
+
+classifier:
+  model: "claude-sonnet-4-6"
+  confidence_threshold: 0.7
+
+animator:
+  resolution: "1920x1080"
+  fps: 30
+  panel_duration:
+    action: 2.5
+    dialogue: 4.0
+    emotion: 5.0
+    background: 3.5
+    other: 3.0
+
+audio:
+  tts_enabled: true
+  tts_model: "kokoro"
+  rvc_enabled: false
+  bgm_volume: 0.3
+  sfx_volume: 0.6
+  voice_volume: 1.0
+
+renderer:
+  format: "mp4"
+  quality: "high"
+  subtitle: true
